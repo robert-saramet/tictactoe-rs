@@ -1,6 +1,9 @@
 use console::Term;
 use dialoguer::Select;
 use std::fmt::{Display, Formatter, Result};
+use std::time::Duration;
+use std::thread::sleep;
+use std::io::{stdout, Write};
 
 enum Keymap {
     Standard,
@@ -39,6 +42,7 @@ impl Default for Game {
             opponent: Opponent::Computer,
             difficulty: Some(Difficulty::Easy),
             keymap: Keymap::Standard,
+            score: 0,
         }
     }
 }
@@ -64,9 +68,80 @@ struct Game {
     opponent: Opponent,
     difficulty: Option<Difficulty>,
     keymap: Keymap,
+    score: u32,
 }
 
 impl Game {
+    fn setup() -> Self {
+        println!("Welcome to tic-tac-toe");
+
+        // TODO: Consider refactoring to use other data structures
+
+        const OPPONENT_PROMPT: &str = "Play against";
+        const OPPONENTS: [&str; 2] = ["the computer", "another human"];
+        const DIFFICULTY_PROMPT: &str = "Difficulty";
+        const DIFFICULTIES: [&str; 2] = ["easy", "hard"];
+        const PLAYER_PROMPT: &str = "Player";
+        const PLAYERS: [&str; 2] = ["X", "O"];
+        const KEYMAP_PROMPT: &str = "Keymap";
+        const KEYMAPS: [&str; 2] = [
+            "standard - top-left (1) to bottom-right (9)",
+            "numpad - bottom-right (1) to top-left (9)",
+        ];
+        const PROMPTS: [&str; 4] = [
+            OPPONENT_PROMPT,
+            DIFFICULTY_PROMPT,
+            PLAYER_PROMPT,
+            KEYMAP_PROMPT,
+        ];
+        const OPTIONS: [[&str; 2]; 4] = [OPPONENTS, DIFFICULTIES, PLAYERS, KEYMAPS];
+
+        let mut choices = [0, 0, 0, 0];
+        for ((i, prompt), items) in PROMPTS.iter().enumerate().zip(OPTIONS.iter()) {
+            // Don't prompt for difficulty when playing against another human
+            if i == 1 && choices[0] == 1 {
+                continue;
+            }
+            choices[i] = Select::new()
+                .with_prompt(prompt.to_owned())
+                .items(items)
+                .default(0)
+                .interact()
+                .unwrap();
+        }
+
+        let grid = Grid::default();
+        let player = if choices[2] == 0 { Cell::X } else { Cell::O };
+        let turn = Cell::X;
+        let opponent = if choices[0] == 1 {
+            Opponent::Human
+        } else {
+            Opponent::Computer
+        };
+        let difficulty = if choices[0] == 1 {
+            if choices[1] == 0 {
+                Some(Difficulty::Easy)
+            } else {
+                Some(Difficulty::Hard)
+            }
+        } else {
+            None
+        };
+        let keymap = if choices[3] == 0 {
+            Keymap::Standard
+        } else {
+            Keymap::Numpad
+        };
+        Game {
+            grid,
+            player,
+            turn,
+            opponent,
+            difficulty,
+            keymap,
+            score: 0,
+        }
+    }
     // TODO: Highlight winning sequence
     // TODO: Handle tie conditions
     fn check_winner(&self) -> Option<Cell> {
@@ -180,79 +255,23 @@ impl Game {
 }
 
 fn main() {
-    println!("Welcome to tic-tac-toe");
-
-    // TODO: Consider refactoring to use other data structures
-
-    const OPPONENT_PROMPT: &str = "Play against";
-    const OPPONENTS: [&str; 2] = ["the computer", "another human"];
-    const DIFFICULTY_PROMPT: &str = "Difficulty";
-    const DIFFICULTIES: [&str; 2] = ["easy", "hard"];
-    const PLAYER_PROMPT: &str = "Player";
-    const PLAYERS: [&str; 2] = ["X", "O"];
-    const KEYMAP_PROMPT: &str = "Keymap";
-    const KEYMAPS: [&str; 2] = [
-        "standard - top-left (1) to bottom-right (9)",
-        "numpad - bottom-right (1) to top-left (9)",
-    ];
-    const PROMPTS: [&str; 4] = [
-        OPPONENT_PROMPT,
-        DIFFICULTY_PROMPT,
-        PLAYER_PROMPT,
-        KEYMAP_PROMPT,
-    ];
-    const OPTIONS: [[&str; 2]; 4] = [OPPONENTS, DIFFICULTIES, PLAYERS, KEYMAPS];
-
-    let mut choices = [0, 0, 0, 0];
-    for ((i, prompt), items) in PROMPTS.iter().enumerate().zip(OPTIONS.iter()) {
-        // Don't prompt for difficulty when playing against another human
-        if i == 1 && choices[0] == 1 {
-            continue;
-        }
-        choices[i] = Select::new()
-            .with_prompt(prompt.to_owned())
-            .items(items)
-            .default(0)
-            .interact()
-            .unwrap();
-    }
-
-    let grid = Grid::default();
-    let player = if choices[2] == 0 { Cell::X } else { Cell::O };
-    let turn = Cell::X;
-    let opponent = if choices[0] == 1 {
-        Opponent::Human
-    } else {
-        Opponent::Computer
-    };
-    let difficulty = if choices[0] == 1 {
-        if choices[1] == 0 {
-            Some(Difficulty::Easy)
-        } else {
-            Some(Difficulty::Hard)
-        }
-    } else {
-        None
-    };
-    let keymap = if choices[3] == 0 {
-        Keymap::Standard
-    } else {
-        Keymap::Numpad
-    };
-    let mut game = Game {
-        grid,
-        player,
-        turn,
-        opponent,
-        difficulty,
-        keymap,
-    };
-
+    let mut game = Game::setup();
     // TODO: Main menu + scoring here
-    // loop {
-    game.play_round();
-    // self.grid = Grid::default();
-    // }
+    loop {
+        game.play_round();
+        game.grid = Grid::default();
+        print!("Starting new game");
+        stdout().flush();
+        let term = Term::stdout();
+        for _ in 0..3 {
+            print!(".");
+            stdout().flush();
+            sleep(Duration::from_millis(500));
+        }
+        // Fix issue with new line getting created
+        term.clear_last_lines(6);
+        term.clear_to_end_of_screen();
+    }
 }
 
 #[cfg(test)]
@@ -324,6 +343,7 @@ mod tests {
         assert_eq!(game.check_winner(), Some(Cell::X));
     }
     // TODO: Test col 0 for O
+
     // TODO: Test lines &columns 1 and 2 for X and O
     #[test]
     fn winner_prim_diag_x() {
