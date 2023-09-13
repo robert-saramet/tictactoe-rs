@@ -30,6 +30,19 @@ impl Default for Cell {
     }
 }
 
+impl Default for Game {
+    fn default() -> Self {
+        Self{
+            grid: Grid::default(),
+            player: Cell::X,
+            turn: Cell::X,
+            opponent: Opponent::Computer,
+            difficulty: Some(Difficulty::Easy),
+            keymap: Keymap::Standard,
+        }
+    }
+}
+
 // TODO: Possibly render the table more fancifully
 impl Display for Cell {
     fn fmt(&self, f: &mut Formatter) -> Result {
@@ -53,143 +66,105 @@ struct Game {
     keymap: Keymap,
 }
 
-// TODO: Possibly render the table more fancifully
-fn print(grid: &Grid) {
-    for row in grid.iter() {
-        for cell in row.iter() {
-            print!("{}\t", cell);
-        }
-        println!();
-    }
-}
-
-// TODO: Highlight winning sequence
-// TODO: Handle tie conditions
-fn check_winner(grid: &Grid) -> Option<Cell> {
-    // Scan rows and columns
-    for i in 0..3 {
-        let (mut x_count_row, mut o_count_row, mut x_count_col, mut o_count_col) = (0, 0, 0, 0);
-        for j in 0..3 {
-            if let Cell::X = grid[i][j] {
-                x_count_row += 1;
-            } else if let Cell::O = grid[i][j] {
-                o_count_row += 1;
+impl Game {
+    // TODO: Highlight winning sequence
+    // TODO: Handle tie conditions
+    fn check_winner(&self) -> Option<Cell> {
+        let grid = self.grid;
+        // Scan rows and columns
+        for i in 0..3 {
+            let (mut x_count_row, mut o_count_row, mut x_count_col, mut o_count_col) = (0, 0, 0, 0);
+            for j in 0..3 {
+                if let Cell::X = grid[i][j] {
+                    x_count_row += 1;
+                } else if let Cell::O = grid[i][j] {
+                    o_count_row += 1;
+                }
+                if let Cell::X = grid[j][i] {
+                    x_count_col += 1;
+                } else if let Cell::O = grid[j][i] {
+                    o_count_col += 1;
+                }
             }
-            if let Cell::X = grid[j][i] {
-                x_count_col += 1;
-            } else if let Cell::O = grid[j][i] {
-                o_count_col += 1;
+            if x_count_row == 3 || x_count_col == 3 {
+                return Some(Cell::X);
+            } else if o_count_row == 3 || o_count_col == 3 {
+                return Some(Cell::O);
             }
         }
-        if x_count_row == 3 || x_count_col == 3 {
-            return Some(Cell::X);
-        } else if o_count_row == 3 || o_count_col == 3 {
-            return Some(Cell::O);
+        // Scan diagonals
+        if ((grid[0][0] == grid[1][1] && grid[1][1] == grid[2][2]) || (grid[0][2] == grid[1][1] && grid[1][1] == grid[2][0])) && grid[1][1] != Cell::Empty {
+            return Some(grid[1][1]);
         }
+        None
     }
-    // Scan diagonals
-    if ((grid[0][0] == grid[1][1] && grid[1][1] == grid[2][2]) || (grid[0][2] == grid[1][1] && grid[1][1] == grid[2][0])) && grid[1][1] != Cell::Empty {
-        return Some(grid[1][1]);
+
+    fn play_turn(_grid: &mut Grid, _player: Cell) {
+
     }
-    None
-}
 
-fn play_turn(_grid: &mut Grid, _player: Cell) {
-    
-}
-
-// TODO: Extract inner play turn code to its own function
-fn computer_game(keymap: Keymap) {
-    let mut grid = Grid::default();
-    let term = Term::stdout();
-
-    // TODO: Allow player to choose symbol
-
-    loop {
-        print(&grid);
-        let winner = check_winner(&grid);
-        if winner.is_some() {
-            // TODO: Highlight winning sequence
-            println!("\n{} won!", winner.unwrap());
-            return;
-        }
+    fn play_turn_human(&self) -> (usize, usize) {
+        let term = Term::stdout();
         println!("Select a cell from 1 to 9");
         // TODO: Handle invalid inputs
         let choice = term.read_char().unwrap().to_digit(10).unwrap() as usize;
         // TODO: Make this DRYer
-        if let Keymap::Numpad = keymap {
+        if let Keymap::Numpad = self.keymap {
             let row = (9 - choice) / 3;
             let col = (choice - 1) % 3;
-            if let Cell::Empty = grid[row][col] {
-                grid[row][col] = Cell::O;
-            }
+            (row, col)
         } else {
             let choice = choice - 1;
             let row = choice / 3;
             let col = choice % 3;
-            if let Cell::Empty = grid[row][col] {
-                grid[row][col] = Cell::O;
+            (row, col)
+        }
+    }
+
+    fn play_turn_computer_random(&self) -> (usize, usize) {
+        todo!();
+    }
+
+    fn play_turn_computer_minimax(&self) -> (usize, usize) {
+        todo!();
+    }
+
+    fn play_round(&mut self) -> Cell {
+        let term = Term::stdout();
+        loop {
+            self.print_grid();
+            if let Some(winner) = self.check_winner() {
+                println!("\n{} won this round!", winner);
+                return winner;
             }
-        }
-        // TODO: Implement computer turn
-        term.clear_last_lines(4);
-    }
-}
-
-fn play_turn_human(game: &Game) -> (usize, usize) {
-    let term = Term::stdout();
-     println!("Select a cell from 1 to 9");
-    // TODO: Handle invalid inputs
-    let choice = term.read_char().unwrap().to_digit(10).unwrap() as usize;
-    // TODO: Make this DRYer
-    if let Keymap::Numpad = game.keymap {
-        let row = (9 - choice) / 3;
-        let col = (choice - 1) % 3;
-        (row, col)
-    } else {
-        let choice = choice - 1;
-        let row = choice / 3;
-        let col = choice % 3;
-        (row, col)
-    }
-}
-
-fn play_turn_computer_random(game: &Game) -> (usize, usize) {
-    todo!();
-}
-
-fn play_turn_computer_minimax(game: &Game) -> (usize, usize) {
-    todo!();
-}
-
-fn play_round(game: &mut Game) -> Cell {
-    let term = Term::stdout();
-    loop {
-        print(&game.grid);
-        if let Some(winner) = check_winner(&game.grid) {
-            println!("\n{} won this round!", winner);
-            return winner;
-        }
-        // let (row, col);
-        let (row, col) = if let Opponent::Computer = game.opponent {
-            if game.turn == game.player {
-                play_turn_human(&game)
-            } else {
-                if let Some(Difficulty::Easy) = game.difficulty {
-                    play_turn_computer_random(&game)
+            let (row, col) = if let Opponent::Computer = self.opponent {
+                if self.turn == self.player {
+                    self.play_turn_human()
+                } else if let Some(Difficulty::Easy) = self.difficulty {
+                    self.play_turn_computer_random()
                 } else {
-                    play_turn_computer_minimax(&game)
+                    self.play_turn_computer_minimax()
                 }
+            } else {
+                self.play_turn_human()
+            };
+            if let Cell::Empty = self.grid[row][col] {
+                self.grid[row][col] = self.turn;
+                self.turn = if let Cell::X = self.turn {Cell::O} else {Cell::X};
             }
-        } else {
-            play_turn_human(&game)
-        };
-        if let Cell::Empty = game.grid[row][col] {
-            game.grid[row][col] = game.turn;
-            game.turn = if let Cell::X = game.turn {Cell::O} else {Cell::X};
+            // TODO: Implement computer turn
+            term.clear_last_lines(4);
         }
-        // TODO: Implement computer turn
-        term.clear_last_lines(4);
+    }
+
+    // TODO: Possibly render the table more fancifully
+    fn print_grid(&self) {
+        for row in self.grid.iter() {
+            for cell in row.iter() {
+                print!("{}\t", cell);
+            }
+            println!();
+        }
     }
 }
 
@@ -235,8 +210,8 @@ fn main() {
 
     // TODO: Main menu + scoring here
     // loop {
-        play_round(&mut game);
-        // game.grid = Grid::default();
+        game.play_round();
+        // self.grid = Grid::default();
     // }
 }
 
@@ -250,7 +225,8 @@ mod tests {
         // X   O   O
         // X   O   X
         let grid = [[Cell::O, Cell::X, Cell::X], [Cell::X, Cell::O, Cell::O], [Cell::X, Cell::O, Cell::X]];
-        assert_eq!(check_winner(&grid), None);
+        let game = Game{grid, ..Game::default()};
+        assert_eq!(game.check_winner(), None);
     }
     #[test]
     fn winner_line_0_x() {
@@ -258,7 +234,8 @@ mod tests {
         // O   X   O
         // X   O   O
         let grid = [[Cell::X, Cell::O, Cell::X], [Cell::X, Cell::X, Cell::O], [Cell::X, Cell::O, Cell::O]];
-        assert_eq!(check_winner(&grid), Some(Cell::X));
+        let game = Game{grid, ..Game::default()};
+        assert_eq!(game.check_winner(), Some(Cell::X));
     }
     #[test]
     fn winner_line_0_o() {
@@ -266,7 +243,8 @@ mod tests {
         // X   O   X
         // O   X   X
         let grid = [[Cell::O, Cell::X, Cell::O], [Cell::O, Cell::O, Cell::X], [Cell::O, Cell::X, Cell::X]];
-        assert_eq!(check_winner(&grid), Some(Cell::O));
+        let game = Game{grid, ..Game::default()};
+        assert_eq!(game.check_winner(), Some(Cell::O));
     }
     #[test]
     fn winner_col_0_x() {
@@ -274,7 +252,8 @@ mod tests {
         // X   X   O
         // X   O   O
         let grid = [[Cell::X, Cell::X, Cell::X], [Cell::O, Cell::X, Cell::O], [Cell::X, Cell::O, Cell::O]];
-        assert_eq!(check_winner(&grid), Some(Cell::X));
+        let game = Game{grid, ..Game::default()};
+        assert_eq!(game.check_winner(), Some(Cell::X));
     }
     // TODO: Test col 0 for O
     // TODO: Test lines &columns 1 and 2 for X and O
@@ -284,7 +263,8 @@ mod tests {
         // O   X   O
         // X   O   X
         let grid = [[Cell::X, Cell::O, Cell::X], [Cell::O, Cell::X, Cell::O], [Cell::X, Cell::O, Cell::X]];
-        assert_eq!(check_winner(&grid), Some(Cell::X));
+        let game = Game{grid, ..Game::default()};
+        assert_eq!(game.check_winner(), Some(Cell::X));
     }
     // TODO: Test primary diagonal for O
     // TODO: Test secondary diagonal for X and O
