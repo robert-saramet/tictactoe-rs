@@ -194,7 +194,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tictactoe-2"
+name = "tictactoe"
 version = "0.1.0"
 dependencies = [
  "console",
