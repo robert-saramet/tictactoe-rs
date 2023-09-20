@@ -92,7 +92,6 @@ impl Default for Cell {
     }
 }
 
-// TODO: Possibly render the table more fancifully
 impl Display for Cell {
     fn fmt(&self, f: &mut Formatter) -> Result {
         if self.empty {
@@ -105,14 +104,12 @@ impl Display for Cell {
 
 impl Game {
     fn terminal_setup_prompts() -> Self {
-        // TODO: Remove this in production?
         let term = Term::stdout();
         term.clear_screen()
             .expect("Failed to clear the terminal - quitting");
 
         println!("Welcome to tic-tac-toe");
 
-        // TODO: Consider refactoring to use other data structures
 
         const OPPONENT_PROMPT: &str = "Play against";
         const OPPONENTS: [&str; 2] = ["the computer", "another human"];
@@ -176,7 +173,6 @@ impl Game {
         }
     }
 
-    // TODO: Possibly render the table more fancifully
     fn print_grid(&self) {
         for row in self.grid.iter() {
             for cell in row.iter() {
@@ -251,7 +247,6 @@ impl Game {
         self.state
     }
 
-    // TODO: Highlight winning sequence
     fn check_winner(&self) -> Option<Mark> {
         let grid = &self.grid;
         for i in 0..3 {
@@ -297,7 +292,6 @@ impl Game {
         println!("{}'s turn", self.turn);
         println!("Select a cell from 1 to 9");
         let choice = self.get_human_input(0);
-        // TODO: Make this DRYer
         let row = match self.keymap {
             Keymap::Standard => (choice - 1) / 3,
             Keymap::Numpad => (9 - choice) / 3,
@@ -463,9 +457,7 @@ mod win_tests {
         };
         assert_eq!(game.check_winner(), Some(Mark::X));
     }
-    // TODO: Test col 0 for O
 
-    // TODO: Test lines &columns 1 and 2 for X and O
     #[test]
     fn winner_prim_diag_x() {
         // X   O   X
@@ -482,9 +474,6 @@ mod win_tests {
         };
         assert_eq!(game.check_winner(), Some(Mark::X));
     }
-    // TODO: Test primary diagonal for O
-    // TODO: Test secondary diagonal for X and O
-    // TODO: Test total count of winning cases is 5478
 }
 
 #[cfg(test)]
