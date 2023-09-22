@@ -28,14 +28,14 @@ impl Default for Game {
             turn: Mark::X,
             opponent: Opponent::Computer,
             difficulty: Difficulty::Easy,
-            keymap: Keymap::Standard,
+            keymap: Keymap::Numpad,
             score_x: 0,
             score_o: 0,
         }
     }
 }
 
-type Grid = [[Cell; 3]; 3];
+type Grid = [Cell; 9];
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
@@ -110,7 +110,6 @@ impl Game {
 
         println!("Welcome to tic-tac-toe");
 
-
         const OPPONENT_PROMPT: &str = "Play against";
         const OPPONENTS: [&str; 2] = ["the computer", "another human"];
         const DIFFICULTY_PROMPT: &str = "Difficulty";
@@ -174,11 +173,11 @@ impl Game {
     }
 
     fn print_grid(&self) {
-        for row in self.grid.iter() {
-            for cell in row.iter() {
-                print!("{}\t", cell);
+        for (i, cell) in self.grid.iter().enumerate() {
+            print!("{}\t", cell);
+            if (i + 1) % 3 == 0 {
+                println!();
             }
-            println!();
         }
     }
 
@@ -198,7 +197,7 @@ impl Game {
                 println!("\nIt's a tie");
                 return;
             }
-            let (row, col) = if let Opponent::Computer = self.opponent {
+            let choice = if let Opponent::Computer = self.opponent {
                 if self.turn == self.player {
                     sleep(Duration::from_millis(500));
                     self.play_turn_human()
@@ -209,8 +208,8 @@ impl Game {
                 self.play_turn_human()
             };
             // Set cell if it is empty
-            if self.grid[row][col].empty {
-                self.grid[row][col] = Cell {
+            if self.grid[choice].empty {
+                self.grid[choice] = Cell {
                     empty: false,
                     mark: self.turn,
                 };
@@ -226,88 +225,59 @@ impl Game {
     }
 
     fn check_state(&mut self) -> State {
-        // Check if game is won
+        // Check and return if game is won
         if let Some(winner) = self.check_winner() {
             self.state = State::Won(winner);
             return self.state;
         }
-        let mut empty_cells = 0;
-        for row in 0..3 {
-            for col in 0..3 {
-                if self.grid[row][col].empty {
-                    empty_cells += 1;
-                }
-            }
-        }
-        if empty_cells == 0 {
-            self.state = State::Tie;
+        // Check and return early if any moves are available
+        if self.grid.iter().any(|cell| cell.empty) {
+            self.state = State::Ongoing;
             return self.state;
         }
-        self.state = State::Ongoing;
+        // If no moves are available then it's a tie
+        self.state = State::Tie;
         self.state
     }
 
     fn check_winner(&self) -> Option<Mark> {
         let grid = &self.grid;
+        // Check if all cells on a row/column are the same and not empty
         for i in 0..3 {
-            // Check if all cells in a row are the same and not empty
-            if grid[i]
-                .iter()
-                .all(|&cell| cell == grid[i][0] && !cell.empty)
-            {
-                return Some(grid[i][0].mark);
-            }
-            // Check if all cells in a column are the same and not empty
-            if grid
-                .iter()
-                .map(|row| row[i])
-                .all(|cell| cell == grid[0][i] && !cell.empty)
-            {
-                return Some(grid[0][i].mark);
+            let j = i * 3;
+            if !grid[i].empty && grid[i] == grid[i + 3] && grid[i + 3] == grid[i + 6] {
+                // eq columns
+                return Some(grid[i].mark);
+            } else if !grid[j].empty && grid[j] == grid[j + 1] && grid[j + 1] == grid[j + 2] {
+                // eq rows
+                return Some(grid[j].mark);
             }
         }
-        // Scan diagonals
-        // Check if all cells in the primary diagonal are the same and not empty
-        if grid
-            .iter()
-            .enumerate()
-            .map(|(i, row)| row[i])
-            .all(|cell| cell == grid[0][0] && !cell.empty)
+        // Check if all cells on the primary/secondary diagonal are the same and not empty
+        if !grid[4].empty
+            && ((grid[0] == grid[4] && grid[4] == grid[8])
+                || (grid[6] == grid[4] && grid[4] == grid[2]))
         {
-            return Some(grid[0][0].mark);
-        }
-        // Check if all cells in the secondary diagonal are the same and not empty
-        if grid
-            .iter()
-            .enumerate()
-            .map(|(i, row)| row[2 - i])
-            .all(|cell| cell == grid[0][2] && !cell.empty)
-        {
-            return Some(grid[0][2].mark);
+            return Some(grid[4].mark);
         }
         None
     }
 
-    fn play_turn_human(&self) -> (usize, usize) {
+    fn play_turn_human(&self) -> usize {
         println!("{}'s turn", self.turn);
         println!("Select a cell from 1 to 9");
         let choice = self.get_human_input(0);
-        let row = match self.keymap {
-            Keymap::Standard => (choice - 1) / 3,
-            Keymap::Numpad => (9 - choice) / 3,
-        };
-        let col = (choice - 1) % 3;
-        (row, col)
+        match self.keymap {
+            Keymap::Standard => choice - 1,
+            Keymap::Numpad => (choice - 1) % 3 + 3 * (2 - (choice - 1) / 3),
+        }
     }
 
     #[allow(clippy::only_used_in_recursion)]
     fn get_human_input(&self, depth: u8) -> usize {
         // Add a max recursion depth constant
         if depth > 5 {
-            panic!(
-                "Failed to read a valid digit after {} attempts - quitting",
-                depth
-            )
+            panic!("Failed to read a valid digit after 5 attempts - quitting")
         }
         let term = Term::stdout();
         let input = term.read_char();
@@ -321,7 +291,7 @@ impl Game {
             .expect("Failed to convert char to digit - quitting") as usize
     }
 
-    fn play_turn_computer(&self) -> (usize, usize) {
+    fn play_turn_computer(&self) -> usize {
         println!("{}'s turn", self.turn);
         print!("Let the computer think");
         for _ in 0..5 {
@@ -336,24 +306,22 @@ impl Game {
         }
     }
 
-    fn play_turn_computer_random(&self) -> (usize, usize) {
+    fn play_turn_computer_random(&self) -> usize {
         let term = Term::stdout();
         let mut empty_cells = vec![];
         // Search for empty cells
-        for row in 0..3 {
-            for col in 0..3 {
-                if self.grid[row][col].empty {
-                    empty_cells.push((row, col));
-                }
-            }
-        }
+        self.grid
+            .iter()
+            .filter(|cell| cell.empty)
+            .enumerate()
+            .for_each(|(i, _)| empty_cells.push(i));
         let id = thread_rng().gen_range(0..empty_cells.len());
         term.clear_to_end_of_screen()
             .expect("Failed to clear terminal - quitting");
         empty_cells[id]
     }
 
-    fn play_turn_computer_minimax(&self) -> (usize, usize) {
+    fn play_turn_computer_minimax(&self) -> usize {
         todo!()
     }
 }
@@ -399,9 +367,7 @@ mod win_tests {
         // X   O   O
         // X   O   X
         let grid = [
-            [CELL_O, CELL_X, CELL_X],
-            [CELL_X, CELL_O, CELL_O],
-            [CELL_X, CELL_O, CELL_X],
+            CELL_O, CELL_X, CELL_X, CELL_X, CELL_O, CELL_O, CELL_X, CELL_O, CELL_X,
         ];
         let game = Game {
             grid,
@@ -415,9 +381,7 @@ mod win_tests {
         // O   X   O
         // X   O   O
         let grid = [
-            [CELL_X, CELL_O, CELL_X],
-            [CELL_X, CELL_X, CELL_O],
-            [CELL_X, CELL_O, CELL_O],
+            CELL_X, CELL_X, CELL_O, CELL_X, CELL_O, CELL_X, CELL_X, CELL_O, CELL_O,
         ];
         let game = Game {
             grid,
@@ -431,9 +395,7 @@ mod win_tests {
         // X   O   X
         // O   X   X
         let grid = [
-            [CELL_O, CELL_X, CELL_O],
-            [CELL_O, CELL_O, CELL_X],
-            [CELL_O, CELL_X, CELL_X],
+            CELL_O, CELL_X, CELL_O, CELL_O, CELL_O, CELL_X, CELL_O, CELL_X, CELL_X,
         ];
         let game = Game {
             grid,
@@ -447,9 +409,7 @@ mod win_tests {
         // X   X   O
         // X   O   O
         let grid = [
-            [CELL_X, CELL_X, CELL_X],
-            [CELL_O, CELL_X, CELL_O],
-            [CELL_X, CELL_O, CELL_O],
+            CELL_X, CELL_X, CELL_X, CELL_O, CELL_X, CELL_O, CELL_X, CELL_O, CELL_O,
         ];
         let game = Game {
             grid,
@@ -464,9 +424,7 @@ mod win_tests {
         // O   X   O
         // X   O   X
         let grid = [
-            [CELL_X, CELL_O, CELL_X],
-            [CELL_O, CELL_X, CELL_O],
-            [CELL_X, CELL_O, CELL_X],
+            CELL_X, CELL_O, CELL_X, CELL_O, CELL_X, CELL_O, CELL_X, CELL_O, CELL_X,
         ];
         let game = Game {
             grid,
@@ -494,9 +452,7 @@ mod tie_tests {
         // O   X   X
         // X   O   O
         let grid = [
-            [CELL_X, CELL_X, CELL_O],
-            [CELL_O, CELL_X, CELL_X],
-            [CELL_X, CELL_O, CELL_O],
+            CELL_X, CELL_X, CELL_O, CELL_O, CELL_X, CELL_X, CELL_X, CELL_O, CELL_O,
         ];
         let mut game = Game {
             grid,
@@ -516,7 +472,7 @@ mod setup_tests {
             empty: true,
             mark: Mark::X,
         };
-        const EMPTY_GRID: [[Cell; 3]; 3] = [[E, E, E], [E, E, E], [E, E, E]];
+        const EMPTY_GRID: [Cell; 9] = [E, E, E, E, E, E, E, E, E];
         assert_eq!(Grid::default(), EMPTY_GRID);
     }
 
